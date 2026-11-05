@@ -17,7 +17,7 @@ func main() {
 
 	predictor, err := classifier.NewPredictor(modelPath)
 	if err != nil {
-		log.Printf("⚠️ No se pudo cargar el modelo ONNX localmente, continuando sin modelo: %v", err)
+		log.Printf("⚠️ ONNX no disponible, usando reglas de respaldo: %v", err)
 	}
 
 	// Probamos la función de NOAA para verificar que responda en consola
