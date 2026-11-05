@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Climate Alert Agent - California Network (°F)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; }
+        #app { display: flex; height: 100vh; position: relative; }
+        #sidebar { width: 380px; padding: 20px; background: #1e1e1e; box-shadow: 2px 0 10px rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+        #map { flex: 1; background: #121212; }
+        
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .lang-switch { display: flex; gap: 5px; background: #2a2a2a; padding: 3px; border-radius: 6px; }
+        .lang-btn { background: none; border: none; color: #aaa; padding: 4px 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 12px; }
+        .lang-btn.active { background: #2e7d32; color: #fff; }
+
+        .filter-group { margin-bottom: 12px; background: #2a2a2a; padding: 10px 12px; border-radius: 8px; }
+        .filter-group label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
+        .filter-group select { width: 100%; padding: 8px; background: #121212; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 13px; }
+        
+        .card { background: #2a2a2a; border-radius: 8px; padding: 12px; margin-bottom: 12px; border-left: 4px solid #4fc3f7; }
+        .card.risk { border-left-color: #e57373; background: #3a2222; }
+        .card.pest { border-right: 4px solid #ffb74d; }
+        .card.hail { border-top: 3px solid #81d4fa; }
+        
+        .farm-title { font-weight: bold; font-size: 15px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .county-badge { font-size: 11px; background: #333; padding: 2px 6px; border-radius: 4px; color: #ffb74d; }
+        .crop-badge { font-size: 11px; background: #1b4d3e; padding: 2px 6px; border-radius: 4px; color: #81c784; margin-left: 5px; }
+        .area-badge { font-size: 11px; background: #37474f; padding: 2px 6px; border-radius: 4px; color: #90caf9; margin-left: 5px; }
+        .pest-badge { font-size: 11px; background: #bf360c; padding: 2px 6px; border-radius: 4px; color: #ffe0b2; margin-top: 4px; display: inline-block; }
+        .hail-badge { font-size: 11px; background: #0288d1; padding: 2px 6px; border-radius: 4px; color: #e0f7fa; margin-top: 4px; margin-left: 4px; display: inline-block; }
+
+        .metric-row { display: flex; justify-content: space-between; font-size: 13px; color: #ddd; margin-top: 6px; }
+        .temp-val { font-size: 20px; font-weight: bold; color: #ffcc80; }
+        .status-ok { color: #81c784; }
+        .status-risk { color: #e57373; font-weight: bold; }
+
+        /* Widget de Chat Agrobiológico */
+        #chat-widget { position: absolute; bottom: 20px; right: 20px; z-index: 2000; width: 360px; background: #1e1e1e; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.7); border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; height: 430px; }
+        #chat-header { background: #2e7d32; color: #fff; padding: 12px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        #chat-body { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #141414; }
+        .msg { padding: 8px 12px; border-radius: 8px; font-size: 13px; max-width: 85%; line-height: 1.4; white-space: pre-line; }
+        .msg.bot { background: #2a2a2a; color: #e0e0e0; align-self: flex-start; border-left: 3px solid #81c784; }
+        .msg.user { background: #1565c0; color: #fff; align-self: flex-end; }
+        #chat-input-area { display: flex; padding: 8px; background: #1e1e1e; border-top: 1px solid #333; }
+        #chat-input { flex: 1; padding: 8px; background: #121212; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 13px; }
+        #chat-send { background: #2e7d32; color: #fff; border: none; padding: 8px 14px; margin-left: 6px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="sidebar">
+            <div class="header-bar">
+                <h2 style="margin:0;">🐻 California Network</h2>
+                <div class="lang-switch">
+                    <button id="btn-es" class="lang-btn active" onclick="setLanguage('es')">ES</button>
+                    <button id="btn-en" class="lang-btn" onclick="setLanguage('en')">EN</button>
+                </div>
+            </div>
+            <p id="sub-title" style="color: #aaa; font-size: 13px; margin-bottom: 15px;">Monitoreo Agrícola Exclusivo (°F)</p>
+            
+            <div class="filter-group">
+                <label id="lbl-county" for="countyFilter">FILTRAR POR REGIÓN / CONDADO:</label>
+                <select id="countyFilter" onchange="applyFilters()">
+                    <option value="ALL" class="opt-all-county">Todos los condados</option>
+                    <option value="San Joaquin Valley">San Joaquin Valley</option>
+                    <option value="Kern County">Kern County</option>
+                    <option value="Monterey County">Monterey County</option>
+                    <option value="Napa County">Napa County</option>
+                    <option value="Imperial County">Imperial County</option>
+                    <option value="Sacramento Valley">Sacramento Valley</option>
+                    <option value="Ventura County">Ventura County</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label id="lbl-crop" for="cropFilter">FILTRAR POR TIPO DE CULTIVO:</label>
+                <select id="cropFilter" onchange="applyFilters()">
+                    <option value="ALL" class="opt-all-crop">Todos los cultivos</option>
+                    <option value="Almendros">Almendros</option>
+                    <option value="Cítricos y Uva">Cítricos y Uva</option>
+                    <option value="Hortalizas">Hortalizas</option>
+                    <option value="Viñedos">Viñedos</option>
+                    <option value="Forraje y Hortalizas">Forraje y Hortalizas</option>
+                    <option value="Nueces">Nueces</option>
+                    <option value="Aguacates / Fresas">Aguacates / Fresas</option>
+                </select>
+            </div>
+
+            <div id="farms-container">Cargando valles de California...</div>
+        </div>
+
+        <div id="map"></div>
+
+        <!-- Chat del Agricultor -->
+        <div id="chat-widget">
+            <div id="chat-header">
+                <span id="chat-title">🤖 Agripilot</span>
+                <span style="font-size: 11px; background: #1b5e20; padding: 2px 6px; border-radius: 4px;">IA Live</span>
+            </div>
+            <div id="chat-body">
+                <div class="msg bot" id="chat-welcome">¡Hola! Soy Agripilot. Puedo responderte sobre Granizo, Plagas Satelitales, Heladas, Humedad, Superficie Cultivada y Tipo de Cultivo.</div>
+            </div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Ej: ¿Hay alerta de granizo en California?" onkeydown="if(event.key==='Enter') sendChatMessage()">
+                <button id="chat-send" onclick="sendChatMessage()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let currentLang = 'es';
+
+        const i18n = {
+            es: {
+                subtitle: "Monitoreo Agrícola Exclusivo (°F)",
+                lblCounty: "FILTRAR POR REGIÓN / CONDADO:",
+                lblCrop: "FILTRAR POR TIPO DE CULTIVO:",
+                allCounty: "Todos los condados",
+                allCrop: "Todos los cultivos",
+                loading: "Cargando valles de California...",
+                cropLabel: "Cultivo",
+                areaLabel: "Superficie",
+                humidityLabel: "Humedad",
+                windLabel: "Viento",
+                statusOk: "✅ NORMAL",
+                statusRisk: "⚠️ HELADA",
+                pestAlertLabel: "🐛 PLAGA:",
+                hailAlertLabel: "🧊 GRANIZO",
+                chatTitle: "🤖 Agripilot",
+                chatWelcome: "¡Hola! Soy Agripilot. Puedo responderte sobre Granizo, Plagas Satelitales, Heladas, Humedad, Superficie Cultivada y Tipo de Cultivo.",
+                chatPlaceholder: "Ej: ¿Hay alerta de granizo en California?",
+                chatSend: "Enviar"
+            },
+            en: {
+                subtitle: "Exclusive Agricultural Monitoring (°F)",
+                lblCounty: "FILTER BY REGION / COUNTY:",
+                lblCrop: "FILTER BY CROP TYPE:",
+                allCounty: "All Counties",
+                allCrop: "All Crops",
+                loading: "Loading California Valleys...",
+                cropLabel: "Crop",
+                areaLabel: "Area",
+                humidityLabel: "Humidity",
+                windLabel: "Wind",
+                statusOk: "✅ NORMAL",
+                statusRisk: "⚠️ FROST RISK",
+                pestAlertLabel: "🐛 PEST:",
+                hailAlertLabel: "🧊 HAIL ALERT",
+                chatTitle: "🤖 Agripilot",
+                chatWelcome: "Hello! I am Agripilot. I can assist you with Hail Alerts, Satellite Pests, Frost, Humidity, Cultivated Area, and Crop Type.",
+                chatPlaceholder: "Ex: Is there a hail alert in California?",
+                chatSend: "Send"
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('btn-es').className = `lang-btn ${lang === 'es' ? 'active' : ''}`;
+            document.getElementById('btn-en').className = `lang-btn ${lang === 'en' ? 'active' : ''}`;
+
+            document.getElementById('sub-title').innerText = i18n[lang].subtitle;
+            document.getElementById('lbl-county').innerText = i18n[lang].lblCounty;
+            document.getElementById('lbl-crop').innerText = i18n[lang].lblCrop;
+            
+            document.querySelectorAll('.opt-all-county').forEach(el => el.innerText = i18n[lang].allCounty);
+            document.querySelectorAll('.opt-all-crop').forEach(el => el.innerText = i18n[lang].allCrop);
+
+            document.getElementById('chat-title').innerText = i18n[lang].chatTitle;
+            document.getElementById('chat-welcome').innerText = i18n[lang].chatWelcome;
+            document.getElementById('chat-input').placeholder = i18n[lang].chatPlaceholder;
+            document.getElementById('chat-send').innerText = i18n[lang].chatSend;
+
+            applyFilters();
+        }
+
+        const southWest = L.latLng(32.5, -124.5);
+        const northEast = L.latLng(42.0, -114.0);
+        const caliBounds = L.latLngBounds(southWest, northEast);
+
+        const map = L.map('map', {
+            maxBounds: caliBounds,
+            maxBoundsViscosity: 1.0,
+            minZoom: 6,
+            maxZoom: 12
+        }).setView([37.2, -119.5], 6);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        fetch('https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/california-counties.geojson')
+            .then(res => res.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    style: {
+                        color: '#ffb74d',
+                        weight: 1.5,
+                        fillColor: '#ffb74d',
+                        fillOpacity: 0.05
+                    }
+                }).addTo(map);
+            });
+
+        const markers = {};
+        let latestData = [];
+
+        const socket = new WebSocket('ws://' + window.location.host + '/ws');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            latestData = data.farms;
+            applyFilters();
+        };
+
+        function applyFilters() {
+            const selectedCounty = document.getElementById('countyFilter').value;
+            const selectedCrop = document.getElementById('cropFilter').value;
+            const container = document.getElementById('farms-container');
+            container.innerHTML = '';
+
+            latestData.forEach(farm => {
+                const matchesCounty = (selectedCounty === 'ALL' || farm.county === selectedCounty);
+                const matchesCrop = (selectedCrop === 'ALL' || farm.crop === selectedCrop);
+                const isVisible = matchesCounty && matchesCrop;
+
+                const markerColor = farm.is_risk ? '#e57373' : (farm.hail_risk ? '#81d4fa' : (farm.pest_risk ? '#ffb74d' : '#81c784'));
+
+                const popupContent = `<b>${farm.name}</b><br>Región: ${farm.county}<br>Cultivo: ${farm.crop} (${farm.area_acres} acres)<br>Temp: ${farm.temp_f.toFixed(1)} °F<br>Granizo: ${farm.hail_risk ? '🧊 Riesgo Activo' : '✅ Sin Riesgo'}<br>Satelital: ${farm.pest_risk ? '⚠️ Plaga (' + farm.pest_name + ')' : '✅ Foliar Óptimo'}`;
+
+                if (!markers[farm.id]) {
+                    const circle = L.circleMarker([farm.lat, farm.lng], {
+                        radius: 9,
+                        fillColor: markerColor,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.85
+                    }).addTo(map);
+
+                    circle.bindPopup(popupContent);
+                    markers[farm.id] = circle;
+                } else {
+                    markers[farm.id].setStyle({ fillColor: markerColor });
+                    markers[farm.id].getPopup().setContent(popupContent);
+                }
+
+                if (isVisible) {
+                    markers[farm.id].addTo(map);
+                    
+                    const card = document.createElement('div');
+                    card.className = `card ${farm.is_risk ? 'risk' : ''} ${farm.pest_risk ? 'pest' : ''} ${farm.hail_risk ? 'hail' : ''}`;
+                    card.innerHTML = `
+                        <div class="farm-title">
+                            <span>${farm.name}</span>
+                            <div><span class="county-badge">${farm.county}</span></div>
+                        </div>
+                        <div style="font-size: 12px; color: #aaa; margin-top: 2px;">
+                            ${i18n[currentLang].cropLabel}: <span class="crop-badge">${farm.crop}</span>
+                            <span class="area-badge">${farm.area_acres} acres</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="temp-val">${farm.temp_f.toFixed(1)} °F</span>
+                            <span class="${farm.is_risk ? 'status-risk' : 'status-ok'}">
+                                ${farm.is_risk ? i18n[currentLang].statusRisk : i18n[currentLang].statusOk}
+                            </span>
+                        </div>
+                        <div class="metric-row">
+                            <span>${i18n[currentLang].humidityLabel}: ${farm.humidity.toFixed(0)}%</span>
+                            <span>${i18n[currentLang].windLabel}: ${farm.wind.toFixed(1)} mph</span>
+                        </div>
+                        <div>
+                            ${farm.pest_risk ? `<div class="pest-badge">${i18n[currentLang].pestAlertLabel} ${farm.pest_name}</div>` : ''}
+                            ${farm.hail_risk ? `<div class="hail-badge">${i18n[currentLang].hailAlertLabel}</div>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(card);
+                } else {
+                    map.removeLayer(markers[farm.id]);
+                }
+            });
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const chatBody = document.getElementById('chat-body');
+            
+            const userMsgElem = document.createElement('div');
+            userMsgElem.className = 'msg user';
+            userMsgElem.innerText = message;
+            chatBody.appendChild(userMsgElem);
+            input.value = '';
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const botMsgElem = document.createElement('div');
+                botMsgElem.className = 'msg bot';
+                botMsgElem.innerText = data.reply;
+                chatBody.appendChild(botMsgElem);
+                chatBody.scrollTop = chatBody.scrollHeight;
+            })
+            .catch(() => {
+                const botMsgElem = document.createElement('div');
+                botMsgElem.className = 'msg bot';
+                botMsgElem.innerText = '❌ Error de comunicación con Agripilot.';
+                chatBody.appendChild(botMsgElem);
+            });
+        }
+    </script>
+</body>
+</html>

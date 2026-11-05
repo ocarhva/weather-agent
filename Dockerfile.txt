@@ -1,0 +1,29 @@
+# 1. Imagen base oficial de Go sobre Linux
+FROM golang:1.22-bookworm
+
+# 2. Instalar dependencias C/C++ requeridas para ONNX Runtime en Linux
+RUN apt-get update && apt-get install -y \
+    wget \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Descargar e instalar la biblioteca C++ nativa de ONNX Runtime para Linux
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/onnxruntime-linux-x64-1.17.3.tgz \
+    && tar -xzf onnxruntime-linux-x64-1.17.3.tgz \
+    && cp onnxruntime-linux-x64-1.17.3/lib/libonnxruntime.so* /usr/lib/ \
+    && rm -rf onnxruntime-linux-x64-1.17.3*
+
+WORKDIR /app
+
+# 4. Copiar archivos del proyecto Go
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# 5. Compilar la aplicación Go con CGO activado para Linux
+ENV CGO_ENABLED=1
+RUN go build -o agent_app ./cmd/agent
+
+# 6. Comando por defecto al arrancar el contenedor
+CMD ["./agent_app"]
