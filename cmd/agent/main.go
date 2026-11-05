@@ -11,19 +11,13 @@ import (
 )
 
 func main() {
-	dllPath := "models/onnxruntime.dll"
 	modelPath := "models/climate_model.onnx"
 
 	fmt.Println("⚡ Inicializando Climate Alert Agent...")
-	
-	// Intentamos inicializar ONNX pero sin detener el programa si falla localmente
-	if err := classifier.InitONNX(dllPath); err != nil {
-		log.Printf("⚠️ Advertencia: No se pudo cargar ONNX CGO en Windows local: %v", err)
-	}
 
 	predictor, err := classifier.NewPredictor(modelPath)
 	if err != nil {
-		log.Printf("⚠️ No se pudo cargar el modelo ONNX localmente, continuando sin modelo: %v", err)
+		log.Printf("⚠️ ONNX no disponible, usando reglas de respaldo: %v", err)
 	}
 
 	// Probamos la función de NOAA para verificar que responda en consola
@@ -36,8 +30,12 @@ func main() {
 	}
 
 	// Inicia el servidor WebSocket y UI Web en http://localhost:8080
-	fmt.Println("🚀 Servidor listo en http://localhost:8080")
-	websocket.StartServer(":8080", predictor)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("🚀 Servidor listo en el puerto %s\n", port)
+	websocket.StartServer(":"+port, predictor)
 }
 
 func obtenerAlertasNOAA() ([]byte, error) {
