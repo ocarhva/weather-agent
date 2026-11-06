@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	ort "github.com/yalue/onnxruntime_go"
@@ -58,6 +59,7 @@ func NewPredictor(modelPath string) (*Predictor, error) {
 		return p, fmt.Errorf("no se pudo cargar el modelo %s: %w", modelPath, err)
 	}
 	p.session = s
+	log.Printf("ONNX cargado: modelo=%s", filepath.Base(modelPath))
 	return p, nil
 }
 
