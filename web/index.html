@@ -207,7 +207,7 @@
         const markers = {};
         let latestData = [];
 
-        const socket = new WebSocket('ws://' + window.location.host + '/ws');
+        const socket = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws');
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
