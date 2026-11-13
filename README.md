@@ -100,12 +100,15 @@ go run ./cmd/agent
 En PowerShell:
 
 ```powershell
+git clone https://github.com/ocarhva/weather-agent.git
+cd weather-agent
+go mod download
+
 $env:PORT="8080"
-$env:OPENWEATHER_API_KEY="tu_api_key"
 go run ./cmd/agent
 ```
 
-Abre <http://localhost:8080>. La clave de OpenWeather es necesaria para intentar obtener datos meteorológicos reales, pero no para arrancar el servicio. Si ONNX Runtime no está disponible, se usan las reglas de respaldo.
+Abre <http://localhost:8080>. La clave de OpenWeather es opcional; sin ella se muestran mediciones simuladas. Para intentar obtener datos meteorológicos reales, define `OPENWEATHER_API_KEY` antes de iniciar el servicio. Si ONNX Runtime no está disponible, se usan las reglas de respaldo.
 
 ## Ejecutar con Docker
 
